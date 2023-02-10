@@ -5,6 +5,13 @@ const fs = require("fs");
 const app = express();
 const port = 9005;
 
+const CACHE_CLEAR_KEY = process.env.CACHE_CLEAR_KEY;
+
+if (!CACHE_CLEAR_KEY) {
+    console.log("CACHE_CLEAR_KEY not set. Exiting.");
+    process.exit(1);
+}
+
 // define screenshot function
 async function getScreenshot(url, height, width) {
     // if url is 
@@ -12,14 +19,13 @@ async function getScreenshot(url, height, width) {
     const filename = url.replace(/[^a-z0-9]/gi, '_').toLowerCase();
 
     // if url includes &reset=true, delete file
-    if (url.includes("&reset=true")) {
+    if (url.includes("&reset=" + CACHE_CLEAR_KEY)) {
         fs.unlink("images/" + filename + '.png', function (err) {
             if (err) {
                 console.log(err);
             }
         });
     }
-
 
     // if file exists
     if (fs.existsSync("images/" + filename + '.png')) {
@@ -37,6 +43,26 @@ async function getScreenshot(url, height, width) {
         height: parseInt(height),
         width: parseInt(width),
     });
+
+    // add a box to bottom right corner that says "Published in 2021"
+    // this code is here for exploration, but not used in the app
+
+    // await page.evaluate(() => {
+    //     var div = document.createElement("div");
+    //     div.style.position = "absolute";
+    //     div.style.bottom = "0";
+    //     div.style.right = "0";
+    //     div.style.padding = "30px";
+    //     div.style.backgroundColor = "#FFFF00";
+    //     div.style.color = "black";
+    //     div.style.fontFamily = "sans-serif";
+    //     div.style.fontSize = "48px";
+    //     div.style.opacity = "0.8";
+    //     div.style.borderLeft = "1px solid black";
+    //     div.style.borderTop = "1px solid black";
+    //     div.innerHTML = "Published in 2021";
+    //     document.body.appendChild(div);
+    // });
 
     const screenshot = await page.screenshot();
     // save to local file

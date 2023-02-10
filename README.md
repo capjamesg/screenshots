@@ -35,6 +35,10 @@ To install this project, clone the repository and run `npm install`:
     cd screenshots
     npm install
 
+Next, set a `CACHE_CLEAR_KEY` environment variable to a secret string. This will be the key that is used to clear the cache for an image. For example:
+
+    export CACHE_CLEAR_KEY=1234567890
+
 To run the project, execute the following command:
 
     npm start
