@@ -6,6 +6,15 @@ const app = express();
 const port = 9005;
 
 const CACHE_CLEAR_KEY = process.env.CACHE_CLEAR_KEY;
+const WHITE_LIST_DOMAINS = [
+    "jamesg.blog",
+    "screenshots.jamesg.blog",
+    "avtr.dev",
+    "novacast.dev",
+    "breakfastand.coffee",
+    "jamesg.coffee",
+    "archiver.jamesg.blog"
+];
 
 if (!CACHE_CLEAR_KEY) {
     console.log("CACHE_CLEAR_KEY not set. Exiting.");
@@ -84,8 +93,8 @@ function isValidURL (url) {
         // if url doesn't begin with jamesg.blog, skip it
         var domain = full_url.hostname;
         
-        if (domain != "jamesg.blog") {
-            return false;
+        if (WHITE_LIST_DOMAINS.includes(domain)) {
+            return true;
         }
 
         return true;

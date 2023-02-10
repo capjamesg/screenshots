@@ -39,9 +39,15 @@ Next, set a `CACHE_CLEAR_KEY` environment variable to a secret string. This will
 
     export CACHE_CLEAR_KEY=1234567890
 
+Next, open the `screenshot.js` file and add the domains you want to allow screenshots of to the `allowedDomains` array. For example:
+
+    const allowedDomains = [
+        "example.com"
+    ];
+
 To run the project, execute the following command:
 
-    npm start
+    node screenshot.js
 
 This will run the project at `http://localhost:9005`.
 
