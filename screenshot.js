@@ -1,25 +1,26 @@
 const puppeteer = require("puppeteer");
 const express = require("express");
 const fs = require("fs");
+const supabase = require("@supabase/supabase-js");
+const ejs = require("ejs");
+
+// load all values in config.js
+const config = require("./config.js");
 
 const app = express();
-const port = 9005;
 
-const CACHE_CLEAR_KEY = process.env.CACHE_CLEAR_KEY;
-const WHITE_LIST_DOMAINS = [
-    "jamesg.blog",
-    "screenshots.jamesg.blog",
-    "avtr.dev",
-    "novacast.dev",
-    "breakfastand.coffee",
-    "jamesg.coffee",
-    "archiver.jamesg.blog"
-];
+// if images/ doesn't exist, create it
+if (!fs.existsSync("images/")) {
+    fs.mkdirSync("images/");
+}
 
-if (!CACHE_CLEAR_KEY) {
+if (!config.CACHE_CLEAR_KEY) {
     console.log("CACHE_CLEAR_KEY not set. Exiting.");
     process.exit(1);
 }
+
+// const client = supabase.createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const client = supabase.createClient(config.SUPABASE_URL, config.SUPABASE_KEY);
 
 // define screenshot function
 async function getScreenshot(url, height, width) {
@@ -27,13 +28,17 @@ async function getScreenshot(url, height, width) {
     // generate safe file name
     const filename = url.replace(/[^a-z0-9]/gi, '_').toLowerCase();
 
+    // strip all query params
+    url = url.split("?")[0];
+
     // if url includes &reset=true, delete file
-    if (url.includes("&reset=" + CACHE_CLEAR_KEY)) {
+    if (url.includes("&reset=" + config.CACHE_CLEAR_KEY)) {
         fs.unlink("images/" + filename + '.png', function (err) {
             if (err) {
                 console.log(err);
             }
         });
+        deleteFromSupabase(url);
     }
 
     // if file exists
@@ -53,25 +58,8 @@ async function getScreenshot(url, height, width) {
         width: parseInt(width),
     });
 
-    // add a box to bottom right corner that says "Published in 2021"
-    // this code is here for exploration, but not used in the app
-
-    // await page.evaluate(() => {
-    //     var div = document.createElement("div");
-    //     div.style.position = "absolute";
-    //     div.style.bottom = "0";
-    //     div.style.right = "0";
-    //     div.style.padding = "30px";
-    //     div.style.backgroundColor = "#FFFF00";
-    //     div.style.color = "black";
-    //     div.style.fontFamily = "sans-serif";
-    //     div.style.fontSize = "48px";
-    //     div.style.opacity = "0.8";
-    //     div.style.borderLeft = "1px solid black";
-    //     div.style.borderTop = "1px solid black";
-    //     div.innerHTML = "Published in 2021";
-    //     document.body.appendChild(div);
-    // });
+    // save to supabase
+    saveToSupabase(url, width, height);
 
     const screenshot = await page.screenshot();
     // save to local file
@@ -103,6 +91,31 @@ function isValidURL (url) {
     }
 }
 
+async function saveToSupabase(url, width, height) {
+    const { data, error } = await client
+        .from('Screenshots')
+        .insert([
+            { url: url, width: width, height: height, image_url: "/?url=" + url + "&width=" + width + "&height=" + height },
+        ]);
+    console.log(data, error);
+}
+
+async function deleteFromSupabase(url) {
+    const { data, error } = await client
+        .from('Screenshots')
+        .delete()
+        .match({ url: url });
+}
+
+async function getAllScreenshots(){
+    const { data, error } = await client
+        .from('Screenshots')
+        .select('*');
+        
+    return data;
+}
+
+
 app.get("/", function (req, res) {
     var height = req.query.height || 540;
     var width = req.query.width || 960;
@@ -122,19 +135,31 @@ app.get("/", function (req, res) {
 
     // if url is invalid, return 400
     if (!isValidURL(url)) {
+        console.log("Invalid URL: " + url);
         res.status(400).send("Invalid URL");
         return;
     }
 
     var screenshot = getScreenshot(url, height, width);
-
+    
     // wait for promise
+    // res.send("Screenshot will be available at https://screenshots.jamesg.blog/" + url.replace(/[^a-z0-9]/gi, '_').toLowerCase() + ".png");
     screenshot.then(function (result) {
         res.set("Content-Type", "image/png");
         res.send(result);
     });
 });
 
-app.listen(port, function () {
-  console.log(`Screenshot service listening on port ${port}!`);
+app.get("/screenshots", function (req, res) {
+    var data = getAllScreenshots();
+    data.then(function (result) {
+        // send templated file
+        var template = fs.readFileSync("screenshots.html", "utf8");
+        var rendered = ejs.render(template, {screenshots: result});
+        res.send(rendered);
+    });
+});
+
+app.listen(config.PORT, function () {
+  console.log(`Screenshot service listening on port ${config.PORT}!`);
 });
