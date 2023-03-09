@@ -48,24 +48,30 @@ async function getScreenshot(url, height, width) {
 
         return data;
     }
+
+    var screenshot = "";
     
-    const browser = await puppeteer.launch();
-    const page = await browser.newPage();
+    try {
+        const browser = await puppeteer.launch();
+        const page = await browser.newPage();
 
-    await page.goto(url);
-    await page.setViewport({
-        height: parseInt(height),
-        width: parseInt(width),
-    });
+        await page.goto(url);
+        await page.setViewport({
+            height: parseInt(height),
+            width: parseInt(width),
+        });
 
-    // save to supabase
-    saveToSupabase(url, width, height);
+        // save to supabase
+        saveToSupabase(url, width, height);
 
-    const screenshot = await page.screenshot();
-    // save to local file
-    await page.screenshot({path: "images/" + filename + '.png'});
-    
-    await browser.close();
+        screenshot = await page.screenshot();
+        // save to local file
+        await page.screenshot({path: "images/" + filename + '.png'});
+        
+        await browser.close();
+    } catch (err) {
+        console.log(err);
+    }
     return screenshot;
 }
 
@@ -77,18 +83,20 @@ function isValidURL (url) {
         if (protocol != "http:" && protocol != "https:") {
             return false;
         }
-
-        // if url doesn't begin with jamesg.blog, skip it
-        var domain = full_url.hostname;
-        
-        if (WHITE_LIST_DOMAINS.includes(domain)) {
-            return true;
-        }
-
         return true;
     } catch (err) {
         return false;
     }
+}
+
+function isWhitelistedURL (url) {
+    var full_url = new URL(url);
+    var host = full_url.host;
+
+    if (config.WHITE_LIST_DOMAINS.includes(host)) {
+        return true;
+    }
+    return false;
 }
 
 async function saveToSupabase(url, width, height) {
@@ -135,15 +143,18 @@ app.get("/", function (req, res) {
 
     // if url is invalid, return 400
     if (!isValidURL(url)) {
-        console.log("Invalid URL: " + url);
         res.status(400).send("Invalid URL");
+        return;
+    }
+
+    if (!isWhitelistedURL(url)) {
+        res.status(400).send("Hostname not whitelisted");
         return;
     }
 
     var screenshot = getScreenshot(url, height, width);
     
     // wait for promise
-    // res.send("Screenshot will be available at https://screenshots.jamesg.blog/" + url.replace(/[^a-z0-9]/gi, '_').toLowerCase() + ".png");
     screenshot.then(function (result) {
         res.set("Content-Type", "image/png");
         res.send(result);
